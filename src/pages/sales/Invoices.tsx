@@ -1,8 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Search, Filter, Plus, Printer, Eye, CreditCard, FileText, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import InvoiceDetailModal from '../../components/InvoiceDetailModal';
+
+interface Invoice {
+  id: string;
+  date: string;
+  customer: string;
+  amount: number;
+  paid: number;
+  balance: number;
+  paymentType: string;
+  status: string;
+}
 
 export default function Invoices() {
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const summaryCards = [
     { title: 'Total Invoices', value: '24', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
     { title: 'Paid', value: 'LKR 1,250,000', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
@@ -128,7 +142,14 @@ export default function Invoices() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors" title="View">
+                      <button
+                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                        title="View"
+                        onClick={() => {
+                          setSelectedInvoice(invoice);
+                          setIsModalOpen(true);
+                        }}
+                      >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors" title="Print">
@@ -148,6 +169,13 @@ export default function Invoices() {
           </table>
         </div>
       </div>
+
+      {/* Invoice Detail Modal */}
+      <InvoiceDetailModal
+        invoice={selectedInvoice}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   );
 }
