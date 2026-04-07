@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, Printer, Eye, CreditCard, FileText, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import InvoiceDetailModal from '../../components/InvoiceDetailModal';
+import CreateInvoiceModal from '../../components/CreateInvoiceModal';
+import { supabase } from '../../lib/supabase';
 
 interface Invoice {
   id: string;
+  invoice_no: string;
   date: string;
   customer: string;
   amount: number;
@@ -17,19 +20,84 @@ interface Invoice {
 export default function Invoices() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const summaryCards = [
-    { title: 'Total Invoices', value: '24', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { title: 'Paid', value: 'LKR 1,250,000', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { title: 'Pending / Partial', value: 'LKR 450,000', icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
-    { title: 'Overdue', value: 'LKR 125,000', icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
-  ];
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const mockInvoices = [
-    { id: 'INV-2026-001', date: '2026-04-01', customer: 'Acme Corp', amount: 500000, paid: 500000, balance: 0, paymentType: 'Cash', status: 'Paid' },
-    { id: 'INV-2026-002', date: '2026-04-02', customer: 'Global Traders', amount: 750000, paid: 250000, balance: 500000, paymentType: 'Cheque', status: 'Partial' },
-    { id: 'INV-2026-003', date: '2026-03-15', customer: 'Local Mart', amount: 125000, paid: 0, balance: 125000, paymentType: 'Credit', status: 'Overdue' },
-    { id: 'INV-2026-004', date: '2026-04-03', customer: 'City Supermarket', amount: 300000, paid: 300000, balance: 0, paymentType: 'Cheque+Cash', status: 'Paid' },
-    { id: 'INV-2026-005', date: '2026-04-03', customer: 'Mega Foods', amount: 900000, paid: 0, balance: 900000, paymentType: 'Multi-Cheque', status: 'Pending' },
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const fetchInvoices = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(`
+          id,
+          invoice_no,
+          invoice_date,
+          total_amount,
+          cash_amount,
+          cheque_amount,
+          payment_method,
+          status,
+          customers (
+            customer_name
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedInvoices: Invoice[] = data.map((inv: any) => {
+          const paid = (inv.cash_amount || 0) + (inv.cheque_amount || 0);
+          const balance = inv.total_amount - paid;
+          
+          let paymentType = 'Cash';
+          if (inv.payment_method === 'cash') paymentType = 'Cash';
+          else if (inv.payment_method === 'cheque') paymentType = 'Cheque';
+          else if (inv.payment_method === 'credit') paymentType = 'Credit';
+          else if (inv.payment_method === 'partial') paymentType = 'Partial';
+
+          let status = inv.status;
+          if (status === 'paid') status = 'Paid';
+          else if (status === 'partial') status = 'Partial';
+          else if (status === 'pending') status = 'Pending';
+          else if (status === 'overdue') status = 'Overdue';
+
+          return {
+            id: inv.id,
+            invoice_no: inv.invoice_no,
+            date: inv.invoice_date,
+            customer: inv.customers?.customer_name || 'Unknown',
+            amount: inv.total_amount,
+            paid: paid,
+            balance: balance,
+            paymentType: paymentType,
+            status: status
+          };
+        });
+        setInvoices(formattedInvoices);
+      }
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const totalInvoices = invoices.length;
+  const totalPaid = invoices.reduce((sum, inv) => sum + inv.paid, 0);
+  const totalPending = invoices.filter(inv => inv.status === 'Pending' || inv.status === 'Partial').reduce((sum, inv) => sum + inv.balance, 0);
+  const totalOverdue = invoices.filter(inv => inv.status === 'Overdue').reduce((sum, inv) => sum + inv.balance, 0);
+
+  const summaryCards = [
+    { title: 'Total Invoices', value: totalInvoices.toString(), icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { title: 'Paid', value: `LKR ${totalPaid.toLocaleString()}`, icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { title: 'Pending / Partial', value: `LKR ${totalPending.toLocaleString()}`, icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+    { title: 'Overdue', value: `LKR ${totalOverdue.toLocaleString()}`, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
   ];
 
   const getStatusColor = (status: string) => {
@@ -98,7 +166,10 @@ export default function Invoices() {
             <option value="global">Global Traders</option>
           </select>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium border border-slate-700 w-full sm:w-auto justify-center">
+        <button 
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium border border-slate-700 w-full sm:w-auto justify-center"
+        >
           <Plus className="w-4 h-4" />
           New Invoice
         </button>
@@ -122,49 +193,63 @@ export default function Invoices() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
-              {mockInvoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-slate-800/20 transition-colors group">
-                  <td className="px-6 py-4 font-medium text-white">{invoice.id}</td>
-                  <td className="px-6 py-4 text-slate-300">{invoice.date}</td>
-                  <td className="px-6 py-4 text-slate-300">{invoice.customer}</td>
-                  <td className="px-6 py-4 text-right font-mono text-white">{invoice.amount.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-right font-mono text-green-400">{invoice.paid.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-right font-mono text-yellow-500">{invoice.balance.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium border", getPaymentTypeColor(invoice.paymentType))}>
-                      {invoice.paymentType}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium border", getStatusColor(invoice.status))}>
-                      {invoice.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-                        title="View"
-                        onClick={() => {
-                          setSelectedInvoice(invoice);
-                          setIsModalOpen(true);
-                        }}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors" title="Print">
-                        <Printer className="w-4 h-4" />
-                      </button>
-                      {invoice.balance > 0 && (
-                        <button className="flex items-center gap-1 px-2.5 py-1.5 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-black rounded-lg transition-colors text-xs font-medium border border-yellow-500/20 hover:border-yellow-500">
-                          <CreditCard className="w-3.5 h-3.5" />
-                          Pay
-                        </button>
-                      )}
-                    </div>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-8 text-center text-slate-400">
+                    Loading invoices...
                   </td>
                 </tr>
-              ))}
+              ) : invoices.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-8 text-center text-slate-400">
+                    No invoices found.
+                  </td>
+                </tr>
+              ) : (
+                invoices.map((invoice) => (
+                  <tr key={invoice.id} className="hover:bg-slate-800/20 transition-colors group">
+                    <td className="px-6 py-4 font-medium text-white">{invoice.invoice_no || invoice.id.substring(0, 8)}</td>
+                    <td className="px-6 py-4 text-slate-300">{invoice.date}</td>
+                    <td className="px-6 py-4 text-slate-300">{invoice.customer}</td>
+                    <td className="px-6 py-4 text-right font-mono text-white">{invoice.amount.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right font-mono text-green-400">{invoice.paid.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right font-mono text-yellow-500">{invoice.balance.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium border", getPaymentTypeColor(invoice.paymentType))}>
+                        {invoice.paymentType}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium border", getStatusColor(invoice.status))}>
+                        {invoice.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                          title="View"
+                          onClick={() => {
+                            setSelectedInvoice(invoice);
+                            setIsModalOpen(true);
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors" title="Print">
+                          <Printer className="w-4 h-4" />
+                        </button>
+                        {invoice.balance > 0 && (
+                          <button className="flex items-center gap-1 px-2.5 py-1.5 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-black rounded-lg transition-colors text-xs font-medium border border-yellow-500/20 hover:border-yellow-500">
+                            <CreditCard className="w-3.5 h-3.5" />
+                            Pay
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -175,6 +260,11 @@ export default function Invoices() {
         invoice={selectedInvoice}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      <CreateInvoiceModal 
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
       />
     </div>
   );

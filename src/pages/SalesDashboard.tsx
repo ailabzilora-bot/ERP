@@ -4,9 +4,11 @@ import Invoices from './sales/Invoices';
 import Customers from './sales/Customers';
 import Payments from './sales/Payments';
 import { FileText, Users, CreditCard } from 'lucide-react';
+import CreateInvoiceModal from '../components/CreateInvoiceModal';
 
 export default function SalesDashboard() {
   const [subTab, setSubTab] = useState('invoices');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const tabs = [
     { id: 'invoices', label: 'Invoices', icon: FileText },
@@ -44,7 +46,10 @@ export default function SalesDashboard() {
           <div className="text-sm text-slate-400 font-medium">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-600 transition-colors font-medium shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+          <button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-600 transition-colors font-medium shadow-[0_0_15px_rgba(234,179,8,0.2)]"
+          >
             <FileText className="w-4 h-4" />
             New Invoice
           </button>
@@ -57,6 +62,11 @@ export default function SalesDashboard() {
         {subTab === 'customers' && <Customers />}
         {subTab === 'payments' && <Payments />}
       </div>
+
+      <CreateInvoiceModal 
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Building2, Calendar, Hash } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { supabase } from '../lib/supabase';
 
 interface InvoiceItem {
   product: string;
@@ -11,6 +12,7 @@ interface InvoiceItem {
 
 interface Invoice {
   id: string;
+  invoice_no: string;
   date: string;
   customer: string;
   amount: number;
@@ -20,34 +22,6 @@ interface Invoice {
   status: string;
 }
 
-// Mock line items per invoice
-const invoiceLineItems: Record<string, InvoiceItem[]> = {
-  'INV-2026-001': [
-    { product: 'Split Red Lentil', qty: 20, unitPrice: 14500, total: 290000 },
-    { product: 'Whole Red Lentil', qty: 10, unitPrice: 13200, total: 132000 },
-    { product: 'Lentil Flour', qty: 15, unitPrice: 5200, total: 78000 },
-  ],
-  'INV-2026-002': [
-    { product: 'Split Red Lentil', qty: 50, unitPrice: 14500, total: 725000 },
-    { product: 'Lentil Husk (By-product)', qty: 5, unitPrice: 5000, total: 25000 },
-  ],
-  'INV-2026-003': [
-    { product: 'Whole Red Lentil', qty: 8, unitPrice: 13200, total: 105600 },
-    { product: 'Lentil Flour', qty: 4, unitPrice: 4850, total: 19400 },
-  ],
-  'INV-2026-004': [
-    { product: 'Split Red Lentil', qty: 12, unitPrice: 14500, total: 174000 },
-    { product: 'Whole Red Lentil', qty: 8, unitPrice: 13200, total: 105600 },
-    { product: 'Lentil Husk (By-product)', qty: 4, unitPrice: 5100, total: 20400 },
-  ],
-  'INV-2026-005': [
-    { product: 'Split Red Lentil', qty: 40, unitPrice: 14500, total: 580000 },
-    { product: 'Whole Red Lentil', qty: 20, unitPrice: 13200, total: 264000 },
-    { product: 'Lentil Flour', qty: 8, unitPrice: 5200, total: 41600 },
-    { product: 'Lentil Husk (By-product)', qty: 3, unitPrice: 4800, total: 14400 },
-  ],
-};
-
 interface InvoiceDetailModalProps {
   invoice: Invoice | null;
   isOpen: boolean;
@@ -56,22 +30,58 @@ interface InvoiceDetailModalProps {
 
 export default function InvoiceDetailModal({ invoice, isOpen, onClose }: InvoiceDetailModalProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [lineItems, setLineItems] = useState<InvoiceItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
+      if (invoice) {
+        fetchInvoiceItems(invoice.id);
+      }
     } else {
       const timer = setTimeout(() => setIsVisible(false), 200);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, invoice]);
+
+  const fetchInvoiceItems = async (invoiceId: string) => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('invoice_items')
+        .select(`
+          qty_bags,
+          unit_price,
+          total,
+          products (
+            product_name
+          )
+        `)
+        .eq('invoice_id', invoiceId);
+
+      if (error) throw error;
+
+      if (data) {
+        const items = data.map((item: any) => ({
+          product: item.products?.product_name || 'Unknown Product',
+          qty: item.qty_bags,
+          unitPrice: item.unit_price,
+          total: item.total
+        }));
+        setLineItems(items);
+      }
+    } catch (error) {
+      console.error('Error fetching invoice items:', error);
+      // Fallback if error
+      setLineItems([{ product: 'Lentil Product', qty: 1, unitPrice: invoice?.amount || 0, total: invoice?.amount || 0 }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isVisible && !isOpen) return null;
   if (!invoice) return null;
-
-  const lineItems = invoiceLineItems[invoice.id] || [
-    { product: 'Lentil Product', qty: 1, unitPrice: invoice.amount, total: invoice.amount },
-  ];
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0);
 
@@ -111,7 +121,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
             </div>
             <div>
               <h2 className="text-lg font-bold text-white tracking-tight">Invoice Preview</h2>
-              <p className="text-xs text-slate-400">{invoice.id}</p>
+              <p className="text-xs text-slate-400">{invoice.invoice_no || invoice.id}</p>
             </div>
           </div>
           <button
@@ -149,7 +159,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
                   <Hash className="w-3 h-3" />
                   Invoice No.
                 </div>
-                <p className="text-white font-mono font-semibold">{invoice.id}</p>
+                <p className="text-white font-mono font-semibold">{invoice.invoice_no || invoice.id.substring(0, 8)}</p>
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium uppercase tracking-wider">
@@ -188,14 +198,28 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
-                  {lineItems.map((item, index) => (
-                    <tr key={index} className="hover:bg-slate-800/20 transition-colors">
-                      <td className="px-5 py-3.5 text-white font-medium">{item.product}</td>
-                      <td className="px-5 py-3.5 text-center text-slate-300 font-mono">{item.qty}</td>
-                      <td className="px-5 py-3.5 text-right text-slate-300 font-mono">{item.unitPrice.toLocaleString()}</td>
-                      <td className="px-5 py-3.5 text-right text-white font-mono font-medium">{item.total.toLocaleString()}</td>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={4} className="px-5 py-6 text-center text-slate-400">
+                        Loading items...
+                      </td>
                     </tr>
-                  ))}
+                  ) : lineItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-5 py-6 text-center text-slate-400">
+                        No items found.
+                      </td>
+                    </tr>
+                  ) : (
+                    lineItems.map((item, index) => (
+                      <tr key={index} className="hover:bg-slate-800/20 transition-colors">
+                        <td className="px-5 py-3.5 text-white font-medium">{item.product}</td>
+                        <td className="px-5 py-3.5 text-center text-slate-300 font-mono">{item.qty}</td>
+                        <td className="px-5 py-3.5 text-right text-slate-300 font-mono">{item.unitPrice.toLocaleString()}</td>
+                        <td className="px-5 py-3.5 text-right text-white font-mono font-medium">{item.total.toLocaleString()}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
