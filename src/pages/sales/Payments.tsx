@@ -1,15 +1,79 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
+
+interface PaymentData {
+  id: string;
+  date: string;
+  invoice: string;
+  customer: string;
+  cash: number | null;
+  cheque: number | null;
+  chequeNo: string | null;
+  bank: string | null;
+  chequeDate: string | null;
+  total: number;
+}
 
 export default function Payments() {
-  const mockPayments = [
-    { id: 'PAY-001', date: '2026-04-01', invoice: 'INV-2026-001', customer: 'Acme Corp', cash: 500000, cheque: null, chequeNo: null, bank: null, chequeDate: null, total: 500000 },
-    { id: 'PAY-002', date: '2026-04-02', invoice: 'INV-2026-002', customer: 'Global Traders', cash: null, cheque: 250000, chequeNo: 'CHQ-987654', bank: 'BOC', chequeDate: '2026-04-15', total: 250000 },
-    { id: 'PAY-003', date: '2026-04-03', invoice: 'INV-2026-004', customer: 'City Supermarket', cash: 100000, cheque: 200000, chequeNo: 'CHQ-123456', bank: 'Commercial Bank', chequeDate: '2026-04-10', total: 300000 },
-    { id: 'PAY-004', date: '2026-04-04', invoice: 'INV-2026-005', customer: 'Mega Foods', cash: null, cheque: 450000, chequeNo: 'CHQ-555666', bank: 'HNB', chequeDate: '2026-04-20', total: 450000 },
-    { id: 'PAY-005', date: '2026-04-04', invoice: 'INV-2026-005', customer: 'Mega Foods', cash: null, cheque: 450000, chequeNo: 'CHQ-555667', bank: 'HNB', chequeDate: '2026-05-20', total: 450000 },
-  ];
+  const [payments, setPayments] = useState<PaymentData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPayments();
+  }, []);
+
+  const fetchPayments = async () => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(`
+          id,
+          invoice_no,
+          invoice_date,
+          cash_amount,
+          cheque_amount,
+          cheque_no,
+          bank,
+          cheque_date,
+          status,
+          customers (
+            customer_name
+          )
+        `)
+        .eq('status', 'paid')
+        .order('invoice_date', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedPayments: PaymentData[] = data.map((inv: any) => {
+          const cash = inv.cash_amount || 0;
+          const cheque = inv.cheque_amount || 0;
+          return {
+            id: inv.id,
+            date: inv.invoice_date || '-',
+            invoice: inv.invoice_no || inv.id.substring(0, 8),
+            customer: inv.customers?.customer_name || '-',
+            cash: cash > 0 ? cash : null,
+            cheque: cheque > 0 ? cheque : null,
+            chequeNo: inv.cheque_no || null,
+            bank: inv.bank || null,
+            chequeDate: inv.cheque_date || null,
+            total: cash + cheque
+          };
+        });
+        setPayments(formattedPayments);
+      }
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -55,31 +119,45 @@ export default function Payments() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
-              {mockPayments.map((payment) => (
-                <tr key={payment.id} className="hover:bg-slate-800/20 transition-colors">
-                  <td className="px-6 py-4 text-slate-300">{payment.date}</td>
-                  <td className="px-6 py-4 font-medium text-white">{payment.invoice}</td>
-                  <td className="px-6 py-4 text-slate-300">{payment.customer}</td>
-                  <td className="px-6 py-4 text-right font-mono text-emerald-400">
-                    {payment.cash ? payment.cash.toLocaleString() : '—'}
-                  </td>
-                  <td className="px-6 py-4 text-right font-mono text-blue-400">
-                    {payment.cheque ? payment.cheque.toLocaleString() : '—'}
-                  </td>
-                  <td className="px-6 py-4 text-center text-slate-400 font-mono">
-                    {payment.chequeNo || '—'}
-                  </td>
-                  <td className="px-6 py-4 text-center text-slate-400">
-                    {payment.bank || '—'}
-                  </td>
-                  <td className="px-6 py-4 text-center text-slate-400">
-                    {payment.chequeDate || '—'}
-                  </td>
-                  <td className="px-6 py-4 text-right font-mono font-bold text-white">
-                    {payment.total.toLocaleString()}
+              {isLoading ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-8 text-center text-slate-400">
+                    Loading payments...
                   </td>
                 </tr>
-              ))}
+              ) : payments.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-8 text-center text-slate-400">
+                    No payments found.
+                  </td>
+                </tr>
+              ) : (
+                payments.map((payment) => (
+                  <tr key={payment.id} className="hover:bg-slate-800/20 transition-colors">
+                    <td className="px-6 py-4 text-slate-300">{payment.date}</td>
+                    <td className="px-6 py-4 font-medium text-white">{payment.invoice}</td>
+                    <td className="px-6 py-4 text-slate-300">{payment.customer}</td>
+                    <td className="px-6 py-4 text-right font-mono text-emerald-400">
+                      {payment.cash ? payment.cash.toLocaleString() : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-right font-mono text-blue-400">
+                      {payment.cheque ? payment.cheque.toLocaleString() : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-center text-slate-400 font-mono">
+                      {payment.chequeNo || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-center text-slate-400">
+                      {payment.bank || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-center text-slate-400">
+                      {payment.chequeDate || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-right font-mono font-bold text-white">
+                      {payment.total.toLocaleString()}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

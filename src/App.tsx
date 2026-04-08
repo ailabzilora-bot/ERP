@@ -10,6 +10,7 @@ import Topbar from './components/Topbar';
 import ProductionDashboard from './pages/ProductionDashboard';
 import PurchasesDashboard from './pages/PurchasesDashboard';
 import SalesDashboard from './pages/SalesDashboard';
+import IncomeDashboard from './pages/IncomeDashboard';
 import CreateProductModal from './components/CreateProductModal';
 
 export default function App() {
@@ -26,7 +27,8 @@ export default function App() {
               {activeTab === 'production' && <ProductionDashboard />}
               {activeTab === 'purchases' && <PurchasesDashboard />}
               {activeTab === 'sales' && <SalesDashboard />}
-              {activeTab !== 'production' && activeTab !== 'purchases' && activeTab !== 'sales' && (
+              {activeTab === 'income' && <IncomeDashboard />}
+              {activeTab !== 'production' && activeTab !== 'purchases' && activeTab !== 'sales' && activeTab !== 'income' && (
                 <div className="flex items-center justify-center h-64 text-slate-500">
                   {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} module coming soon.
                 </div>

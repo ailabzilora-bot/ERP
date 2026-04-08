@@ -28,6 +28,7 @@ export default function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceMod
   const [isLoadingData, setIsLoadingData] = useState(false);
 
   // Form state
+  const [invoiceNo, setInvoiceNo] = useState('');
   const [customer, setCustomer] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -134,7 +135,7 @@ export default function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceMod
   };
 
   const handleCreateInvoice = async () => {
-    if (!customer || !invoiceDate || !dueDate || products.length === 0 || !products[0].product) {
+    if (!invoiceNo || !customer || !invoiceDate || !dueDate || products.length === 0 || !products[0].product) {
       alert("Please fill in all required fields.");
       return;
     }
@@ -143,6 +144,7 @@ export default function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceMod
     try {
       // 1. Insert into invoices table
       const invoicePayload = {
+        invoice_no: invoiceNo,
         customer_id: customer,
         invoice_date: invoiceDate,
         due_date: dueDate,
@@ -238,7 +240,17 @@ export default function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceMod
         {/* Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-8">
           {/* Top Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Invoice No *</label>
+              <input 
+                type="text" 
+                value={invoiceNo}
+                onChange={(e) => setInvoiceNo(e.target.value)}
+                placeholder="INV-001"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all"
+              />
+            </div>
             <div className="space-y-2">
               <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Customer *</label>
               <select 
