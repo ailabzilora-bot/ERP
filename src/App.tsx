@@ -11,6 +11,8 @@ import ProductionDashboard from './pages/ProductionDashboard';
 import PurchasesDashboard from './pages/PurchasesDashboard';
 import SalesDashboard from './pages/SalesDashboard';
 import IncomeDashboard from './pages/IncomeDashboard';
+import PayrollDashboard from './pages/PayrollDashboard';
+import AIAssistantDashboard from './pages/AIAssistantDashboard';
 import CreateProductModal from './components/CreateProductModal';
 
 export default function App() {
@@ -23,12 +25,14 @@ export default function App() {
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
           <Topbar />
           <main className="flex-1 overflow-y-auto p-6 bg-[#0a0f1c]">
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-7xl mx-auto h-full">
               {activeTab === 'production' && <ProductionDashboard />}
               {activeTab === 'purchases' && <PurchasesDashboard />}
               {activeTab === 'sales' && <SalesDashboard />}
               {activeTab === 'income' && <IncomeDashboard />}
-              {activeTab !== 'production' && activeTab !== 'purchases' && activeTab !== 'sales' && activeTab !== 'income' && (
+              {activeTab === 'payroll' && <PayrollDashboard />}
+              {activeTab === 'ai' && <AIAssistantDashboard />}
+              {activeTab !== 'production' && activeTab !== 'purchases' && activeTab !== 'sales' && activeTab !== 'income' && activeTab !== 'payroll' && activeTab !== 'ai' && (
                 <div className="flex items-center justify-center h-64 text-slate-500">
                   {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} module coming soon.
                 </div>

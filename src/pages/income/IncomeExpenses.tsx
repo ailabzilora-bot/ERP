@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, ArrowUpRight, ArrowDownRight, Tag } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { supabase } from '../../lib/supabase';
 import EditEntryModal from '../../components/EditEntryModal';
+import CreateCategoryModal from '../../components/CreateCategoryModal';
+import DeleteCategoryModal from '../../components/DeleteCategoryModal';
 
 interface IncomeExpensesProps {
   onAddEntryClick?: () => void;
@@ -29,6 +31,8 @@ export default function IncomeExpenses({ onAddEntryClick, refreshTrigger = 0 }: 
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [entryToEdit, setEntryToEdit] = useState<Entry | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] = useState(false);
 
   useEffect(() => {
     fetchEntries();
@@ -133,13 +137,29 @@ export default function IncomeExpenses({ onAddEntryClick, refreshTrigger = 0 }: 
               className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all [color-scheme:dark]"
             />
           </div>
-          <button 
-            onClick={onAddEntryClick}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium border border-slate-700 w-full sm:w-auto justify-center"
-          >
-            <Plus className="w-4 h-4" />
-            Add Entry
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button 
+              onClick={() => setIsDeleteCategoryModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-red-400 rounded-lg hover:bg-slate-700 hover:text-red-300 transition-colors font-medium border border-slate-700 w-full sm:w-auto justify-center"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Category
+            </button>
+            <button 
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium border border-slate-700 w-full sm:w-auto justify-center"
+            >
+              <Tag className="w-4 h-4" />
+              Add Category
+            </button>
+            <button 
+              onClick={onAddEntryClick}
+              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-600 transition-colors font-medium w-full sm:w-auto justify-center"
+            >
+              <Plus className="w-4 h-4" />
+              Add Entry
+            </button>
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -330,6 +350,22 @@ export default function IncomeExpenses({ onAddEntryClick, refreshTrigger = 0 }: 
           }}
         />
       )}
+
+      <CreateCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onAddCategory={() => {
+          // Category added successfully
+        }}
+      />
+
+      <DeleteCategoryModal
+        isOpen={isDeleteCategoryModalOpen}
+        onClose={() => setIsDeleteCategoryModalOpen(false)}
+        onDeleteCategory={() => {
+          // Category deleted successfully
+        }}
+      />
     </div>
   );
 }

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Calendar, Building2, ArrowRightLeft, CreditCard } from 'lucide-react';
+import { AlertCircle, Calendar, Building2, ArrowRightLeft, CreditCard, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
+import RegisterBankModal from '../../components/RegisterBankModal';
+import RescheduleChequeModal from '../../components/RescheduleChequeModal';
+import DepositChequeModal from '../../components/DepositChequeModal';
 
 interface Cheque {
   id: string;
@@ -15,13 +18,63 @@ interface Cheque {
   source: string;
 }
 
+interface BankAccount {
+  id: string;
+  name: string;
+  accountNo: string;
+  branch: string;
+  balance: number | string;
+  type: string;
+}
+
 export default function Cheques() {
   const [allCheques, setAllCheques] = useState<Cheque[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRegisterBankModalOpen, setIsRegisterBankModalOpen] = useState(false);
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+  const [selectedChequeForReschedule, setSelectedChequeForReschedule] = useState<{id: string, date: string} | null>(null);
+  
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [selectedChequeForDeposit, setSelectedChequeForDeposit] = useState<Cheque | null>(null);
+
+  const [selectedBanks, setSelectedBanks] = useState<Record<string, string>>({});
+  const [isDepositing, setIsDepositing] = useState<string | null>(null);
+
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [isBanksLoading, setIsBanksLoading] = useState(true);
 
   useEffect(() => {
     fetchCheques();
+    fetchBankAccounts();
   }, []);
+
+  const fetchBankAccounts = async () => {
+    try {
+      setIsBanksLoading(true);
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedBanks: BankAccount[] = data.map((item: any) => ({
+          id: item.id,
+          name: item.bank_name || '-',
+          accountNo: item.account_number || '-',
+          branch: item.branch || '-',
+          balance: item.current_balance || 0,
+          type: item.account_type || 'Current'
+        }));
+        setBankAccounts(formattedBanks);
+      }
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error);
+    } finally {
+      setIsBanksLoading(false);
+    }
+  };
 
   const fetchCheques = async () => {
     try {
@@ -83,11 +136,77 @@ export default function Cheques() {
   const todayStr = new Date().toISOString().split('T')[0];
   const chequesDueToday = allCheques.filter(c => c.dueDate === todayStr && c.status !== 'Deposited');
 
-  const bankAccounts = [
-    { id: '1', name: 'Commercial Bank', accountNo: '1002345678', branch: 'Colombo 01', balance: 1250000 },
-    { id: '2', name: 'Bank of Ceylon', accountNo: '87654321', branch: 'Pettah', balance: 850000 },
-    { id: '3', name: 'Hatton National Bank', accountNo: '003987654', branch: 'Kollupitiya', balance: 420000 },
-  ];
+  const uniqueBankNames = Array.from(new Set(bankAccounts.map(b => b.name)));
+
+  const handleBankSelect = (chequeId: string, bankName: string) => {
+    setSelectedBanks(prev => ({ ...prev, [chequeId]: bankName }));
+  };
+
+  const handleInlineDeposit = async (cheque: Cheque) => {
+    const selectedBankName = selectedBanks[cheque.id];
+    if (!selectedBankName) {
+      alert('Please allocate a bank before depositing.');
+      return;
+    }
+
+    const bankAccount = bankAccounts.find(b => b.name === selectedBankName);
+    if (!bankAccount) {
+      alert('Selected bank account not found.');
+      return;
+    }
+
+    try {
+      setIsDepositing(cheque.id);
+
+      // Parse current balance
+      let currentBalanceNum = 0;
+      if (typeof bankAccount.balance === 'string') {
+        currentBalanceNum = parseFloat(bankAccount.balance.replace(/[^0-9.-]+/g, ''));
+      } else {
+        currentBalanceNum = bankAccount.balance;
+      }
+
+      const newBalanceNum = currentBalanceNum + cheque.amount;
+      
+      // Format new balance
+      const formattedInteger = Math.floor(newBalanceNum).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      const decimalPart = (newBalanceNum % 1).toFixed(2).substring(2);
+      const formattedBalance = `LKR ${formattedInteger}.${decimalPart || '00'}`;
+
+      // Update bank_accounts
+      const { error: bankError } = await supabase
+        .from('bank_accounts')
+        .update({ current_balance: formattedBalance })
+        .eq('id', bankAccount.id);
+
+      if (bankError) throw bankError;
+
+      // Update invoices (cheque status)
+      const { error: invoiceError } = await supabase
+        .from('invoices')
+        .update({ status: 'paid', bank: selectedBankName })
+        .eq('id', cheque.id);
+
+      if (invoiceError) throw invoiceError;
+
+      // Update local state
+      setAllCheques(prev => prev.map(c => c.id === cheque.id ? { ...c, status: 'Deposited', bank: selectedBankName } : c));
+      setBankAccounts(prev => prev.map(b => b.id === bankAccount.id ? { ...b, balance: formattedBalance } : b));
+      
+      // Clear selection
+      setSelectedBanks(prev => {
+        const newState = { ...prev };
+        delete newState[cheque.id];
+        return newState;
+      });
+
+    } catch (error) {
+      console.error('Error depositing cheque:', error);
+      alert('Failed to deposit cheque. Please try again.');
+    } finally {
+      setIsDepositing(null);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -99,7 +218,7 @@ export default function Cheques() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
+    <div className="flex flex-col gap-6">
       {/* Main Content */}
       <div className="flex-1 space-y-6">
         
@@ -140,17 +259,31 @@ export default function Cheques() {
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                  <select className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all">
+                  <select 
+                    value={selectedBanks[cheque.id] || ''}
+                    onChange={(e) => handleBankSelect(cheque.id, e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all"
+                  >
                     <option value="">Allocate to bank...</option>
-                    {bankAccounts.map(bank => (
-                      <option key={bank.id} value={bank.id}>{bank.name} - {bank.accountNo}</option>
+                    {uniqueBankNames.map(name => (
+                      <option key={name} value={name}>{name}</option>
                     ))}
                   </select>
                   <div className="flex gap-2">
-                    <button className="flex-1 sm:flex-none px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm">
-                      Deposit
+                    <button 
+                      onClick={() => handleInlineDeposit(cheque)}
+                      disabled={isDepositing === cheque.id}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isDepositing === cheque.id ? 'Depositing...' : 'Deposit'}
                     </button>
-                    <button className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 hover:text-white transition-colors font-medium text-sm border border-slate-700">
+                    <button 
+                      onClick={() => {
+                        setSelectedChequeForReschedule({ id: cheque.id, date: cheque.dueDate });
+                        setIsRescheduleModalOpen(true);
+                      }}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 hover:text-white transition-colors font-medium text-sm border border-slate-700"
+                    >
                       Reschedule
                     </button>
                   </div>
@@ -210,10 +343,24 @@ export default function Cheques() {
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           {cheque.status !== 'Deposited' && (
                             <>
-                              <button className="p-1.5 text-slate-400 hover:text-yellow-400 hover:bg-yellow-400/10 rounded-lg transition-colors" title="Deposit">
+                              <button 
+                                onClick={() => {
+                                  setSelectedChequeForDeposit(cheque);
+                                  setIsDepositModalOpen(true);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-yellow-400 hover:bg-yellow-400/10 rounded-lg transition-colors" 
+                                title="Deposit"
+                              >
                                 <ArrowRightLeft className="w-4 h-4" />
                               </button>
-                              <button className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors" title="Reschedule">
+                              <button 
+                                onClick={() => {
+                                  setSelectedChequeForReschedule({ id: cheque.id, date: cheque.dueDate });
+                                  setIsRescheduleModalOpen(true);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors" 
+                                title="Reschedule"
+                              >
                                 <Calendar className="w-4 h-4" />
                               </button>
                             </>
@@ -227,61 +374,132 @@ export default function Cheques() {
             </table>
           </div>
         </div>
-      </div>
-
-      {/* Right Side Panels */}
-      <div className="w-full lg:w-80 space-y-6">
-        {/* Bank Accounts */}
-        <div className="bg-[#111827] border border-slate-800 rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Building2 className="w-5 h-5 text-slate-400" />
-            <h3 className="font-semibold text-white">Bank Accounts</h3>
-          </div>
-          <div className="space-y-4">
-            {bankAccounts.map((bank) => (
-              <div key={bank.id} className="p-4 rounded-lg bg-slate-900 border border-slate-800">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h4 className="text-sm font-medium text-white">{bank.name}</h4>
-                    <p className="text-xs text-slate-500">{bank.branch}</p>
-                  </div>
-                  <span className="text-xs font-mono text-slate-400">{bank.accountNo}</span>
-                </div>
-                <div className="pt-2 border-t border-slate-800/50 mt-2">
-                  <p className="text-xs text-slate-500 mb-1">Current Balance</p>
-                  <p className="font-mono font-bold text-emerald-400">LKR {bank.balance.toLocaleString()}</p>
-                </div>
+        {/* Bottom Panels: Bank Accounts & Analytics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Bank Accounts */}
+          <div className="bg-[#111827] border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-900/50">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-slate-400" />
+                <h3 className="font-semibold text-white">Bank Accounts</h3>
               </div>
-            ))}
+              <button 
+                onClick={() => setIsRegisterBankModalOpen(true)}
+                className="p-1.5 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-black rounded-lg transition-colors"
+                title="Add Bank Account"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-800/50 text-slate-400">
+                  <tr>
+                    <th className="px-6 py-4 font-medium">Bank & Branch</th>
+                    <th className="px-6 py-4 font-medium">Account No.</th>
+                    <th className="px-6 py-4 font-medium text-right">Current Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {isBanksLoading ? (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-8 text-center text-slate-400">Loading bank accounts...</td>
+                    </tr>
+                  ) : bankAccounts.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-8 text-center text-slate-400">No bank accounts found</td>
+                    </tr>
+                  ) : (
+                    bankAccounts.map((bank) => (
+                      <tr key={bank.id} className="hover:bg-slate-800/20 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-medium text-white">{bank.name}</div>
+                          <div className="text-xs text-slate-500">{bank.branch}</div>
+                        </td>
+                        <td className="px-6 py-4 font-mono text-slate-400">{bank.accountNo}</td>
+                        <td className="px-6 py-4 text-right font-mono font-bold text-emerald-400">
+                          {typeof bank.balance === 'number' ? `LKR ${bank.balance.toLocaleString()}` : bank.balance}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-        {/* Cheque Analytics */}
-        <div className="bg-[#111827] border border-slate-800 rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <CreditCard className="w-5 h-5 text-slate-400" />
-            <h3 className="font-semibold text-white">Cheque Analytics</h3>
-          </div>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/50 border border-slate-800/50">
-              <span className="text-slate-400 text-sm">Due this week</span>
-              <span className="font-mono text-yellow-400 font-medium">LKR 900,000</span>
+          {/* Cheque Analytics */}
+          <div className="bg-[#111827] border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+            <div className="flex items-center gap-2 p-6 border-b border-slate-800 bg-slate-900/50">
+              <CreditCard className="w-5 h-5 text-slate-400" />
+              <h3 className="font-semibold text-white">Cheque Analytics</h3>
             </div>
-            <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/50 border border-slate-800/50">
-              <span className="text-slate-400 text-sm">Due next week</span>
-              <span className="font-mono text-blue-400 font-medium">LKR 150,000</span>
-            </div>
-            <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/50 border border-slate-800/50">
-              <span className="text-slate-400 text-sm">Deposited this month</span>
-              <span className="font-mono text-emerald-400 font-medium">LKR 300,000</span>
-            </div>
-            <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/50 border border-slate-800/50">
-              <span className="text-slate-400 text-sm">Cheques payable</span>
-              <span className="font-mono text-red-400 font-medium">LKR 0</span>
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-800/50 text-slate-400">
+                  <tr>
+                    <th className="px-6 py-4 font-medium">Metric</th>
+                    <th className="px-6 py-4 font-medium text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  <tr className="hover:bg-slate-800/20 transition-colors">
+                    <td className="px-6 py-4 text-slate-400">Due this week</td>
+                    <td className="px-6 py-4 text-right font-mono text-yellow-400 font-medium">LKR 900,000</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/20 transition-colors">
+                    <td className="px-6 py-4 text-slate-400">Due next week</td>
+                    <td className="px-6 py-4 text-right font-mono text-blue-400 font-medium">LKR 150,000</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/20 transition-colors">
+                    <td className="px-6 py-4 text-slate-400">Deposited this month</td>
+                    <td className="px-6 py-4 text-right font-mono text-emerald-400 font-medium">LKR 300,000</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/20 transition-colors">
+                    <td className="px-6 py-4 text-slate-400">Cheques payable</td>
+                    <td className="px-6 py-4 text-right font-mono text-red-400 font-medium">LKR 0</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       </div>
+
+      <RegisterBankModal 
+        isOpen={isRegisterBankModalOpen}
+        onClose={() => setIsRegisterBankModalOpen(false)}
+        onAddAccount={(newAccount) => {
+          setBankAccounts(prev => [newAccount, ...prev]);
+        }}
+      />
+
+      <RescheduleChequeModal 
+        isOpen={isRescheduleModalOpen}
+        onClose={() => {
+          setIsRescheduleModalOpen(false);
+          setSelectedChequeForReschedule(null);
+        }}
+        chequeId={selectedChequeForReschedule?.id || null}
+        currentDate={selectedChequeForReschedule?.date || ''}
+        onReschedule={(id, newDate) => {
+          setAllCheques(prev => prev.map(c => c.id === id ? { ...c, dueDate: newDate } : c));
+        }}
+      />
+
+      <DepositChequeModal
+        isOpen={isDepositModalOpen}
+        onClose={() => {
+          setIsDepositModalOpen(false);
+          setSelectedChequeForDeposit(null);
+        }}
+        cheque={selectedChequeForDeposit}
+        bankAccounts={bankAccounts}
+        onDeposit={(id, bankName, newBalance) => {
+          setAllCheques(prev => prev.map(c => c.id === id ? { ...c, status: 'Deposited', bank: bankName } : c));
+          setBankAccounts(prev => prev.map(b => b.name === bankName ? { ...b, balance: newBalance } : b));
+        }}
+      />
     </div>
   );
 }

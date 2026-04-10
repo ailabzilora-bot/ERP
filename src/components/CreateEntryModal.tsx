@@ -14,6 +14,11 @@ export default function CreateEntryModal({ isOpen, onClose, onAddEntry }: Create
   const [type, setType] = useState<'income' | 'expense'>('income');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Categories State
+  const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [category, setCategory] = useState('Sales Revenue');
@@ -23,12 +28,39 @@ export default function CreateEntryModal({ isOpen, onClose, onAddEntry }: Create
   const [source, setSource] = useState('');
 
   useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setIsLoadingCategories(true);
+        const { data, error } = await supabase
+          .from('categories')
+          .select('category_name, incomeorexpense');
+        
+        if (error) throw error;
+
+        if (data) {
+          const income = data.filter(c => c.incomeorexpense?.toLowerCase() === 'income').map(c => c.category_name);
+          const expense = data.filter(c => c.incomeorexpense?.toLowerCase() === 'expense').map(c => c.category_name);
+          
+          setIncomeCategories(income);
+          setExpenseCategories(expense);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
       // Reset form when opened
       setType('income');
       setDate(new Date().toISOString().split('T')[0]);
-      setCategory('Sales Revenue');
+      setCategory(incomeCategories.length > 0 ? incomeCategories[0] : '');
       setDescription('');
       setAmount('');
       setPaymentMethod('Cash');
@@ -37,21 +69,18 @@ export default function CreateEntryModal({ isOpen, onClose, onAddEntry }: Create
       const timer = setTimeout(() => setIsVisible(false), 200);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, incomeCategories]);
 
-  const incomeCategories = ['Sales Revenue', 'By-Product Sales', 'Other Income'];
-  const expenseCategories = ['Supplier Payments', 'Payroll', 'Operational Expense'];
-  
   const currentCategories = type === 'income' ? incomeCategories : expenseCategories;
 
   // Ensure selected category is valid for current type
   useEffect(() => {
-    if (type === 'income' && !incomeCategories.includes(category)) {
+    if (type === 'income' && incomeCategories.length > 0 && !incomeCategories.includes(category)) {
       setCategory(incomeCategories[0]);
-    } else if (type === 'expense' && !expenseCategories.includes(category)) {
+    } else if (type === 'expense' && expenseCategories.length > 0 && !expenseCategories.includes(category)) {
       setCategory(expenseCategories[0]);
     }
-  }, [type, category]);
+  }, [type, category, incomeCategories, expenseCategories]);
 
   if (!isVisible && !isOpen) return null;
 
@@ -183,11 +212,18 @@ export default function CreateEntryModal({ isOpen, onClose, onAddEntry }: Create
                   required
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all"
+                  disabled={isLoadingCategories}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all disabled:opacity-50"
                 >
-                  {currentCategories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
+                  {isLoadingCategories ? (
+                    <option value="">Loading...</option>
+                  ) : currentCategories.length === 0 ? (
+                    <option value="">No categories found</option>
+                  ) : (
+                    currentCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))
+                  )}
                 </select>
               </div>
 

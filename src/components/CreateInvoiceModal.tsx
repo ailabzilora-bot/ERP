@@ -169,7 +169,7 @@ export default function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceMod
 
       const invoiceId = invoiceData.id;
 
-      // 2. Send invoice items to webhook
+      // 2. Insert invoice items into Supabase
       const invoiceItemsPayload = products.map(p => ({
         invoice_id: invoiceId,
         product_id: p.product,
@@ -178,17 +178,11 @@ export default function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceMod
         total: p.qty * p.unitPrice
       }));
 
-      const webhookResponse = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/9c6661d7-157f-4085-b99d-ef4e4f02d734', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ items: invoiceItemsPayload }),
-      });
+      const { error: itemsError } = await supabase
+        .from('invoice_items')
+        .insert(invoiceItemsPayload);
 
-      if (!webhookResponse.ok) {
-        console.error('Failed to send invoice items to webhook', webhookResponse.status);
-      }
+      if (itemsError) throw itemsError;
 
       console.log('Invoice created successfully');
       onClose();

@@ -1,39 +1,135 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { supabase } from '../../lib/supabase';
 
 export default function Analytics() {
-  const monthlyData = [
-    { name: 'Oct', income: 4000000, expense: 2400000 },
-    { name: 'Nov', income: 3000000, expense: 1398000 },
-    { name: 'Dec', income: 2000000, expense: 9800000 },
-    { name: 'Jan', income: 2780000, expense: 3908000 },
-    { name: 'Feb', income: 1890000, expense: 4800000 },
-    { name: 'Mar', income: 2390000, expense: 3800000 },
-  ];
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [expenseBreakdown, setExpenseBreakdown] = useState<any[]>([]);
+  const [netProfitTrend, setNetProfitTrend] = useState<any[]>([]);
+  const [topCustomers, setTopCustomers] = useState<any[]>([]);
+  const [chequeFlow, setChequeFlow] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const expenseBreakdown = [
-    { name: 'Supplier Payments', value: 65, color: '#ef4444' },
-    { name: 'Payroll', value: 20, color: '#f97316' },
-    { name: 'Operational', value: 15, color: '#3b82f6' },
-  ];
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, []);
 
-  const netProfitTrend = monthlyData.map(d => ({
-    name: d.name,
-    profit: d.income - d.expense
-  }));
+  const fetchAnalyticsData = async () => {
+    try {
+      setIsLoading(true);
+      
+      const [ieResponse, invResponse] = await Promise.all([
+        supabase.from('income_expense').select('*'),
+        supabase.from('invoices').select('*, customers(customer_name)')
+      ]);
 
-  const topCustomers = [
-    { name: 'Acme Corp', value: 1250000 },
-    { name: 'Global Traders', value: 850000 },
-    { name: 'Mega Foods', value: 650000 },
-    { name: 'City Supermarket', value: 450000 },
-  ];
+      const ieData = ieResponse.data || [];
+      const invData = invResponse.data || [];
 
-  const chequeFlow = [
-    { name: 'Receivable', value: 1050000, color: 'bg-blue-500' },
-    { name: 'Deposited', value: 300000, color: 'bg-emerald-500' },
-    { name: 'Payable', value: 0, color: 'bg-red-500' },
-  ];
+      // 1. Monthly Data & Net Profit Trend
+      const monthlyMap = new Map();
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      ieData.forEach(row => {
+        const date = new Date(row.date);
+        const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+        
+        if (!monthlyMap.has(monthKey)) {
+          // Use year * 100 + month for proper sorting
+          const sortKey = date.getFullYear() * 100 + date.getMonth();
+          monthlyMap.set(monthKey, { name: monthKey, income: 0, expense: 0, sortKey });
+        }
+        
+        const monthData = monthlyMap.get(monthKey);
+        if (row.entry_type === 'income') {
+          monthData.income += row.amount;
+        } else if (row.entry_type === 'expense') {
+          monthData.expense += row.amount;
+        }
+      });
+
+      const processedMonthlyData = Array.from(monthlyMap.values())
+        .sort((a, b) => a.sortKey - b.sortKey)
+        .map(({ name, income, expense }) => ({ name, income, expense }));
+
+      setMonthlyData(processedMonthlyData);
+      
+      setNetProfitTrend(processedMonthlyData.map(d => ({
+        name: d.name,
+        profit: d.income - d.expense
+      })));
+
+      // 2. Expense Breakdown
+      const expenseMap = new Map();
+      ieData.filter(r => r.entry_type === 'expense').forEach(row => {
+        expenseMap.set(row.category, (expenseMap.get(row.category) || 0) + row.amount);
+      });
+
+      const colors = ['#ef4444', '#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#f43f5e', '#14b8a6', '#eab308', '#6366f1'];
+      const totalExpense = Array.from(expenseMap.values()).reduce((a, b) => a + b, 0);
+      
+      const processedExpenseBreakdown = Array.from(expenseMap.entries())
+        .map(([name, value], index) => ({
+          name,
+          value: totalExpense > 0 ? Math.round((value / totalExpense) * 100) : 0,
+          amount: value,
+          color: colors[index % colors.length]
+        }))
+        .sort((a, b) => b.value - a.value);
+
+      setExpenseBreakdown(processedExpenseBreakdown);
+
+      // 3. Top Customers
+      const customerMap = new Map();
+      invData.forEach(row => {
+        const customerName = row.customers?.customer_name || 'Unknown';
+        customerMap.set(customerName, (customerMap.get(customerName) || 0) + row.total_amount);
+      });
+
+      const processedTopCustomers = Array.from(customerMap.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 4);
+
+      setTopCustomers(processedTopCustomers);
+
+      // 4. Cheque Flow
+      let receivable = 0;
+      let deposited = 0;
+      let payable = 0;
+
+      invData.filter(r => r.payment_method === 'cheque').forEach(row => {
+        if (row.status === 'paid') {
+          deposited += row.cheque_amount || 0;
+        } else {
+          receivable += row.cheque_amount || 0;
+        }
+      });
+
+      ieData.filter(r => r.payment_method === 'cheque' && r.entry_type === 'expense').forEach(row => {
+        payable += row.amount;
+      });
+
+      setChequeFlow([
+        { name: 'Receivable', value: receivable, color: 'bg-blue-500' },
+        { name: 'Deposited', value: deposited, color: 'bg-emerald-500' },
+        { name: 'Payable', value: payable, color: 'bg-red-500' },
+      ]);
+
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-400">
+        Loading analytics...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
