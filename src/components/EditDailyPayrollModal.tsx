@@ -64,7 +64,7 @@ export default function EditDailyPayrollModal({ isOpen, onClose, record, onSave 
         status: status
       };
 
-      await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/6630b156-8ebf-40ec-91db-260bae286d59', {
+      await fetch('https://n8n.srv843245.hstgr.cloud/webhook/6630b156-8ebf-40ec-91db-260bae286d59', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

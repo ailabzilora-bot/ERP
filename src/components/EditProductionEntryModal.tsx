@@ -45,7 +45,7 @@ export default function EditProductionEntryModal({ entry, onClose }: EditProduct
     setDeletingLineId(itemToDelete);
     setDeleteError(null);
     try {
-      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/35fd3a48-b406-4882-b340-f7df464298b5', {
+      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/35fd3a48-b406-4882-b340-f7df464298b5', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,7 +111,7 @@ export default function EditProductionEntryModal({ entry, onClose }: EditProduct
         payload.lines = currentLinesPayload;
       }
 
-      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/5cdcd5ee-24a6-4b3d-9e44-bbef08df98a0', {
+      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/5cdcd5ee-24a6-4b3d-9e44-bbef08df98a0', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -76,7 +76,7 @@ export default function EditProductModal({ product, onClose }: EditProductModalP
           ...updatedFields
         };
 
-        const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/bf0dc067-72be-4394-ba2c-3781900b3743', {
+        const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/bf0dc067-72be-4394-ba2c-3781900b3743', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

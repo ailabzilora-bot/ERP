@@ -295,7 +295,7 @@ export default function GRNEntry() {
       // Send data to webhook
       try {
         console.log('Sending data to webhook...', { grnEntry, grnItems: grnItemsToInsert });
-        const webhookResponse = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/c2e7ee23-1932-49a1-b00d-8034a3ac0c81', {
+        const webhookResponse = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/c2e7ee23-1932-49a1-b00d-8034a3ac0c81', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -311,9 +311,9 @@ export default function GRNEntry() {
         if (!webhookResponse.ok) {
           const errorText = await webhookResponse.text();
           console.error('Webhook failed with status:', webhookResponse.status, 'Response:', errorText);
-          // If it's a 404 on a webhook-test URL, it usually means the n8n workflow is not actively listening
-          if (webhookResponse.status === 404 && webhookResponse.url.includes('webhook-test')) {
-            console.warn('Note: n8n test webhooks only work when you click "Execute Workflow" in the n8n UI.');
+          // If it's a 404 on a webhook URL, it usually means the n8n workflow is not active
+          if (webhookResponse.status === 404 && webhookResponse.url.includes('webhook')) {
+            console.warn('Note: n8n webhook returned 404. Ensure the workflow is active in the n8n UI.');
           }
         } else {
           console.log('Webhook sent successfully!');

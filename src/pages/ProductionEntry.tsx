@@ -62,7 +62,7 @@ export default function ProductionEntry() {
         }))
       };
 
-      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/a860100c-790d-4451-92d5-5a38626d29ee', {
+      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/a860100c-790d-4451-92d5-5a38626d29ee', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ export default function ProductionEntry() {
     setIsDeletingBatch(true);
     setDeleteBatchError(null);
     try {
-      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/4c0e38a0-65d8-435d-b566-ec6e14613dd1', {
+      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/4c0e38a0-65d8-435d-b566-ec6e14613dd1', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

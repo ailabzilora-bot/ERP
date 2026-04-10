@@ -71,7 +71,7 @@ export default function EditEntryModal({ isOpen, onClose, onEditEntry, entry }: 
     setIsSubmitting(true);
     try {
       // Send data to webhook
-      await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/73bd48e3-d584-4adb-9376-a1a104e5ebe1', {
+      await fetch('https://n8n.srv843245.hstgr.cloud/webhook/73bd48e3-d584-4adb-9376-a1a104e5ebe1', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

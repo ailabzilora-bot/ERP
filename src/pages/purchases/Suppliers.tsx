@@ -382,7 +382,7 @@ export default function Suppliers() {
         }
       };
 
-      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/5054af35-0291-431a-977f-78b7cd6f8880', {
+      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/5054af35-0291-431a-977f-78b7cd6f8880', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
