@@ -48,7 +48,7 @@ export default function AIAssistantDashboard() {
     setIsTyping(true);
 
     try {
-      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/ad8607fb-86d3-4f87-9ac4-2e3c596991ff', {
+      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/ad8607fb-86d3-4f87-9ac4-2e3c596991ff', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

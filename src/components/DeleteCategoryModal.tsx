@@ -71,7 +71,7 @@ export default function DeleteCategoryModal({ isOpen, onClose, onDeleteCategory 
     try {
       setIsSubmitting(true);
       
-      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/37fc1ce3-90e2-4e02-8196-56ac8efa346a', {
+      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/37fc1ce3-90e2-4e02-8196-56ac8efa346a', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

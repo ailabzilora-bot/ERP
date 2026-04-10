@@ -77,7 +77,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSave }:
       setIsSubmitting(true);
       
       // Send data to webhook
-      await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/22c8f311-7763-4e9b-b2d9-dfdc40332866', {
+      await fetch('https://n8n.srv843245.hstgr.cloud/webhook/22c8f311-7763-4e9b-b2d9-dfdc40332866', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

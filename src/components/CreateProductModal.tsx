@@ -66,7 +66,7 @@ export default function CreateProductModal() {
         notes: notes
       };
 
-      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/3aeccbd3-e484-4a20-895d-50ebf8a1fbf4', {
+      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/3aeccbd3-e484-4a20-895d-50ebf8a1fbf4', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

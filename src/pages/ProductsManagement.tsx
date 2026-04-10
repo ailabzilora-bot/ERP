@@ -36,7 +36,7 @@ export default function ProductsManagement() {
     setIsDeleting(true);
     setDeleteError(null);
     try {
-      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook-test/4c81fd14-e027-400b-b4b2-7e3e29bd59cc', {
+      const response = await fetch('https://n8n.srv843245.hstgr.cloud/webhook/4c81fd14-e027-400b-b4b2-7e3e29bd59cc', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
